@@ -11,7 +11,7 @@ infrastructure_vpc_subnets:
     az: us-west-1b
   - name: execution
     cidr: 172.16.1.0/24
-    az: us-west-1b
+    az: us-west-1c
   - name: hub
     cidr: 172.16.2.0/24
     az: us-west-1b
