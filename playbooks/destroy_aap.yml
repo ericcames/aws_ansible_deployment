@@ -4,15 +4,14 @@
   connection: local
 
   tasks:
-
     - name: Check if the controller VMs are already provisioned
       register: infrastructure_existing_vm
       amazon.aws.ec2_instance_info:
         filters:
-          "tag:purpose": automation
-          "tag:environment": ansible-automation-platform
-          "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
-          "instance-state-name":
+          tag:purpose: automation
+          tag:environment: ansible-automation-platform
+          tag:deployment: aap-infrastructure-{{ deployment_id }}
+          instance-state-name:
             - pending
             - running
             - shutting-down
@@ -35,7 +34,6 @@
   become: true
 
   tasks:
-
     - name: Unregister subscription manager
       community.general.redhat_subscription:
         state: absent
@@ -47,7 +45,6 @@
   connection: local
 
   tasks:
-
     - name: Deploy Infrastructure
       ansible.builtin.import_role:
         name: infrastructure

@@ -5,8 +5,8 @@
     region: "{{ infrastructure_region }}"
     state: absent
     filters:
-      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
-      "instance-state-name":
+      tag:deployment: aap-infrastructure-{{ deployment_id }}
+      instance-state-name:
         - pending
         - running
         - shutting-down
@@ -19,7 +19,7 @@
   amazon.aws.rds_instance:
     region: "{{ infrastructure_region }}"
     state: absent
-    db_instance_identifier: "aap-infrastructure-{{ deployment_id }}-db"
+    db_instance_identifier: aap-infrastructure-{{ deployment_id }}-db
     skip_final_snapshot: true
 
 - name: Delete db subnet group
@@ -27,12 +27,12 @@
   amazon.aws.rds_subnet_group:
     region: "{{ infrastructure_region }}"
     state: absent
-    name: "aap-infrastructure-{{ deployment_id }}-subnet-group"
+    name: aap-infrastructure-{{ deployment_id }}-subnet-group
 
 - name: Delete load balancer
   register: deleted_lb
   amazon.aws.elb_application_lb:
-    name: "aap-infrastructure-{{ deployment_id }}-lb"
+    name: aap-infrastructure-{{ deployment_id }}-lb
     region: "{{ infrastructure_region }}"
     state: absent
     wait: true
@@ -41,7 +41,7 @@
   register: deleted_target_group
   community.aws.elb_target_group:
     region: "{{ infrastructure_region }}"
-    name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+    name: aap-infrastructure-{{ deployment_id }}-lbtg
     state: absent
     wait: true
 
@@ -53,7 +53,7 @@
 - name: Delete load balancer certificate
   register: deleted_cert
   community.aws.aws_acm:
-    name_tag: "aap-infrastructure-{{ deployment_id }}-cert"
+    name_tag: aap-infrastructure-{{ deployment_id }}-cert
     region: "{{ infrastructure_region }}"
     state: absent
 
@@ -62,14 +62,14 @@
   amazon.aws.ec2_vpc_net_info:
     region: "{{ infrastructure_region }}"
     filters:
-      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+      tag:deployment: aap-infrastructure-{{ deployment_id }}
 
 - name: Get subnets
   register: subnets
   amazon.aws.ec2_vpc_subnet_info:
     region: "{{ infrastructure_region }}"
     filters:
-      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+      tag:deployment: aap-infrastructure-{{ deployment_id }}
 
 - name: Delete subnets
   loop: "{{ subnets.subnets }}"
@@ -100,7 +100,7 @@
   amazon.aws.ec2_security_group_info:
     region: "{{ infrastructure_region }}"
     filters:
-      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+      tag:deployment: aap-infrastructure-{{ deployment_id }}
 
 - name: Delete security groups
   loop: "{{ sgs.security_groups }}"
@@ -118,7 +118,7 @@
   amazon.aws.ec2_vpc_route_table_info:
     region: "{{ infrastructure_region }}"
     filters:
-      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+      tag:deployment: aap-infrastructure-{{ deployment_id }}
 
 - name: Delete route tables
   loop: "{{ rts.route_tables }}"

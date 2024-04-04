@@ -16,10 +16,10 @@
         - network
       vars:
         vpc_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-vpc"
+          Name: aap-infrastructure-{{ deployment_id }}-vpc
         vpc_tags: "{{ vpc_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.ec2_vpc_net:
-        name: "aap-infrastructure-{{ deployment_id }}-vpc"
+        name: aap-infrastructure-{{ deployment_id }}-vpc
         cidr_block: "{{ infrastructure_vpc_cidr }}"
         purge_tags: false
         region: "{{ infrastructure_region }}"
@@ -42,7 +42,7 @@
         - network
       vars:
         subnet_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-subnet-{{ item.name }}"
+          Name: aap-infrastructure-{{ deployment_id }}-subnet-{{ item.name }}
         subnet_tags: "{{ subnet_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.ec2_vpc_subnet:
         vpc_id: "{{ infrastructure_vpc_id }}"
@@ -68,7 +68,7 @@
         - network
       vars:
         igw_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-igw"
+          Name: aap-infrastructure-{{ deployment_id }}-igw
         igw_tags: "{{ igw_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.ec2_vpc_igw:
         vpc_id: "{{ infrastructure_vpc_id }}"
@@ -92,10 +92,10 @@
         - network
       vars:
         sg_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-sg"
+          Name: aap-infrastructure-{{ deployment_id }}-sg
         sg_tags: "{{ sg_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.ec2_security_group:
-        name: "aap-infrastructure-{{ deployment_id }}-sg"
+        name: aap-infrastructure-{{ deployment_id }}-sg
         description: AAP security group
         vpc_id: "{{ infrastructure_vpc_id }}"
         region: "{{ infrastructure_region }}"
@@ -106,7 +106,7 @@
               - 80
               - 443
               - 27199
-            cidr_ip: 0.0.0.0/0
+            cidr_ip: "0.0.0.0/0"
             rule_desc: allow external ports for SSH, HTTPS, and Automation Mesh
           - proto: icmp
             icmp_type: -1
@@ -125,7 +125,7 @@
             rule_desc: allow aap ports on local net
         rules_egress:
           - proto: all
-            cidr_ip: 0.0.0.0/0
+            cidr_ip: "0.0.0.0/0"
             rule_desc: allow all outbound
         tags: "{{ sg_tags }}"
 
@@ -146,12 +146,12 @@
         - network
       vars:
         rt_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-rt"
+          Name: aap-infrastructure-{{ deployment_id }}-rt
         rt_tags: "{{ rt_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.ec2_vpc_route_table:
         region: "{{ infrastructure_region }}"
         routes:
-          - dest: 0.0.0.0/0
+          - dest: "0.0.0.0/0"
             gateway_id: "{{ infrastructure_igw_id }}"
         vpc_id: "{{ infrastructure_vpc_id }}"
         subnets: "{{ infrastructure_subnet_ids }}"

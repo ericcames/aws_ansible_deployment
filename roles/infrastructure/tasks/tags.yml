@@ -6,7 +6,7 @@
     persistent_tags:
       purpose: automation
       environment: ansible-automation-platform
-      deployment: "aap-infrastructure-{{ deployment_id }}"
+      deployment: aap-infrastructure-{{ deployment_id }}
 
 - name: Merge persistent tags with user defined tags
   tags:

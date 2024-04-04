@@ -4,7 +4,6 @@
   connection: local
 
   tasks:
-
     - name: Deploy Infrastructure
       tags:
         - always
@@ -28,7 +27,6 @@
   become: true
 
   tasks:
-
     - name: Configure RHEL subscription manager
       tags:
         - controller

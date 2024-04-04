@@ -1,13 +1,13 @@
 ---
-- name: "Check if the {{ app_tag }} VMs are already provisioned"
+- name: Check if the {{ app_tag }} VMs are already provisioned
   register: infrastructure_existing_vm
   tags:
     - controller
   amazon.aws.ec2_instance_info:
     filters:
-      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
-      "tag:app": "{{ app_tag }}"
-      "instance-state-name":
+      tag:deployment: aap-infrastructure-{{ deployment_id }}
+      tag:app: "{{ app_tag }}"
+      instance-state-name:
         - pending
         - running
         - shutting-down

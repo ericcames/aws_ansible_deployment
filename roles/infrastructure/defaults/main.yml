@@ -2,7 +2,6 @@
 # Infrastructure Defaults
 infrastructure_region: us-west-1
 infrastructure_tags: []
-
 # Networking
 infrastructure_vpc_cidr: 172.16.0.0/22
 infrastructure_vpc_subnets:
@@ -27,7 +26,7 @@ infrastructure_architecture: x86_64
 infrastructure_ami_filter:
   architecture: "{{ infrastructure_architecture }}"
   owner-id: "309956199498"
-  name: "RHEL-9.2.*_HVM-*"
+  name: RHEL-9.2.*_HVM-*
 
 infrastructure_volumes:
   - device_name: /dev/sda1

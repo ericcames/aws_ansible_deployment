@@ -19,7 +19,6 @@
   ansible.builtin.set_fact:
     infrastructure_hub_vms_to_create: "{{ infrastructure_hub_instances - (infrastructure_existing_vm.instances | default([]) | length) }}"
 
-
 - name: Output number of VMs to create
   tags:
     - hub

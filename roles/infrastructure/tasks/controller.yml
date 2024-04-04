@@ -82,9 +82,9 @@
         - controller
       amazon.aws.ec2_instance_info:
         filters:
-          "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
-          "tag:app": controller
-          "instance-state-name":
+          tag:deployment: aap-infrastructure-{{ deployment_id }}
+          tag:app: controller
+          instance-state-name:
             - pending
             - running
             - shutting-down
@@ -98,14 +98,14 @@
         - controller
       vars:
         vm_lbt_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+          Name: aap-infrastructure-{{ deployment_id }}-lbtg
         vm_lbt_tags: "{{ vm_lbt_additional_tags | combine(_infrastructure_tags) }}"
       when:
         - infrastructure_create_controller_lb
         - infrastructure_existing_vm is defined
         - infrastructure_existing_vm.instances | length > 0
       ansible.builtin.set_fact:
-        infrastructure_lb_targets: "{{ (infrastructure_lb_targets | default([])) + [{\"Id\": item.instance_id, \"Port\": 443}] }}"
+        infrastructure_lb_targets: '{{ (infrastructure_lb_targets | default([])) + [{"Id": item.instance_id, "Port": 443}] }}'
 
     - name: Create a target group for load balancer
       register: infrastructure_lb_target_group
@@ -117,11 +117,11 @@
         - infrastructure_lb_targets | length > 0
       vars:
         vm_lbtg_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+          Name: aap-infrastructure-{{ deployment_id }}-lbtg
         vm_lbtg_tags: "{{ vm_lbtg_additional_tags | combine(_infrastructure_tags) }}"
       community.aws.elb_target_group:
         region: "{{ infrastructure_region }}"
-        name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+        name: aap-infrastructure-{{ deployment_id }}-lbtg
         protocol: https
         port: 443
         vpc_id: "{{ infrastructure_vpc_id }}"
@@ -163,13 +163,13 @@
         - infrastructure_create_controller_lb
       vars:
         vm_cert_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-cert"
+          Name: aap-infrastructure-{{ deployment_id }}-cert
         vm_cert_tags: "{{ vm_cert_additional_tags | combine(_infrastructure_tags) }}"
       community.aws.aws_acm:
         certificate: "{{ lookup('file', infrastructure_cert_path) }}"
         private_key: "{{ lookup('file', infrastructure_cert_key_path) }}"
         domain_name: "{{ infrastructure_cert_domain_name }}"
-        name_tag: "aap-infrastructure-{{ deployment_id }}-cert"
+        name_tag: aap-infrastructure-{{ deployment_id }}-cert
         region: "{{ infrastructure_region }}"
         tags: "{{ vm_cert_tags }}"
 
@@ -185,10 +185,10 @@
         controller_subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'controller', 'name') }}"
         ee_subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'execution', 'name') }}"
         vm_lb_additional_tags:
-          Name: "aap-infrastructure-{{ deployment_id }}-lb"
+          Name: aap-infrastructure-{{ deployment_id }}-lb
         vm_lb_tags: "{{ vm_lb_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.elb_application_lb:
-        name: "aap-infrastructure-{{ deployment_id }}-lb"
+        name: aap-infrastructure-{{ deployment_id }}-lb
         region: "{{ infrastructure_region }}"
         security_groups:
           - "{{ infrastructure_security_group_id }}"
@@ -210,11 +210,11 @@
               - Type: redirect
                 RedirectConfig:
                   Host: "#{host}"
-                  Path: "/#{path}"
+                  Path: /#{path}
                   Port: "443"
                   Protocol: HTTPS
                   Query: "#{query}"
-                  StatusCode: "HTTP_301"
+                  StatusCode: HTTP_301
         ip_address_type: ipv4
         scheme: "{{ infrastructure_lb_scheme }}"
         state: present
