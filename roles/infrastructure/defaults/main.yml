@@ -8,16 +8,16 @@ infrastructure_vpc_cidr: 172.16.0.0/22
 infrastructure_vpc_subnets:
   - name: controller
     cidr: 172.16.0.0/24
-    az: us-west-1a
+    az: us-west-1b
   - name: execution
     cidr: 172.16.1.0/24
-    az: us-west-1a
+    az: us-west-1b
   - name: hub
     cidr: 172.16.2.0/24
-    az: us-west-1a
+    az: us-west-1b
   - name: eda
     cidr: 172.16.3.0/24
-    az: us-west-1a
+    az: us-west-1b
 
 # Compute
 infrastructure_assign_public_ip: true
