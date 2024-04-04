@@ -11,6 +11,9 @@
     #
 
     - name: Create VPC
+      register: infrastructure_vpc
+      tags:
+        - network
       vars:
         vpc_additional_tags:
           Name: "aap-infrastructure-{{ deployment_id }}-vpc"
@@ -22,9 +25,6 @@
         region: "{{ infrastructure_region }}"
         state: present
         tags: "{{ vpc_tags }}"
-      register: infrastructure_vpc
-      tags:
-        - network
 
     - name: Save VPC id
       when: infrastructure_vpc is defined
