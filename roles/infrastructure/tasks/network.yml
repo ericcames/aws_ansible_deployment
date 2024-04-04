@@ -15,7 +15,7 @@
         vpc_additional_tags:
           Name: "aap-infrastructure-{{ deployment_id }}-vpc"
         vpc_tags: "{{ vpc_additional_tags | combine(_infrastructure_tags) }}"
-        register: infrastructure_vpc
+      register: infrastructure_vpc
       tags:
         - network
       amazon.aws.ec2_vpc_net:
