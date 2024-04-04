@@ -52,7 +52,7 @@ infrastructure_execution_shape: m5a.xlarge
 infrastructure_hub_instances: 1
 infrastructure_hub_shape: m5a.large
 
-infrastructure_eda_instances: 0
+infrastructure_eda_instances: 1
 infrastructure_eda_shape: m5a.xlarge
 
 # Database
