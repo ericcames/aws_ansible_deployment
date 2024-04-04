@@ -1,0 +1,29 @@
+---
+- name: Register subscription manager
+  tags:
+    - controller
+    - hub
+    - eda
+  community.general.redhat_subscription:
+    state: present
+    username: "{{ aap_red_hat_username }}"
+    password: "{{ aap_red_hat_password }}"
+    auto_attach: true
+
+- name: Ensure rhsm is managing repos
+  register: rhsp
+  failed_when: rhsp.rc == 1
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.command: sudo subscription-manager config --rhsm.manage_repos=1
+
+- name: Enable the AAP installer repository
+  register: aap_installer_install
+  failed_when: aap_installer_install.rc == 1
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.command: "sudo subscription-manager repos --enable ansible-automation-platform-{{ infrastructure_aap_version }}-for-rhel-{{ infrastructure_rhel_version }}-{{ infrastructure_architecture }}-rpms"

@@ -1,0 +1,54 @@
+---
+- name: Get deployment VMs
+  hosts: localhost
+  connection: local
+
+  tasks:
+
+    - name: Check if the controller VMs are already provisioned
+      register: infrastructure_existing_vm
+      amazon.aws.ec2_instance_info:
+        filters:
+          "tag:purpose": automation
+          "tag:environment": ansible-automation-platform
+          "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+          "instance-state-name":
+            - pending
+            - running
+            - shutting-down
+            - stopping
+            - stopped
+        region: "{{ infrastructure_region }}"
+
+    - name: Add public IP host to aap group
+      loop: "{{ infrastructure_existing_vm.instances }}"
+      when:
+        - infrastructure_existing_vm is defined
+        - infrastructure_existing_vm.instances | length > 0
+      ansible.builtin.add_host:
+        groups:
+          - aap
+        name: "{{ item.public_ip_address }}"
+
+- name: Remove RHEL entitlements
+  hosts: aap
+  become: true
+
+  tasks:
+
+    - name: Unregister subscription manager
+      community.general.redhat_subscription:
+        state: absent
+        username: "{{ aap_red_hat_username }}"
+        password: "{{ aap_red_hat_password }}"
+
+- name: Destroy AWS infrastructure
+  hosts: localhost
+  connection: local
+
+  tasks:
+
+    - name: Deploy Infrastructure
+      ansible.builtin.import_role:
+        name: infrastructure
+        tasks_from: destroy

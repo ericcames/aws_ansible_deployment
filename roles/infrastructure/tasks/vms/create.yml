@@ -1,0 +1,96 @@
+---
+- name: Create VM facts
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.set_fact:
+    vm_name: "aap-infrastructure-{{ deployment_id }}-vm-{{ vm_name_prefix | default('') }}{{ query('community.general.random_string', upper=false, numbers=false, special=false) | first }}"
+
+- name: Debug VM name
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.debug:
+    var: vm_name
+
+- name: Create EC2 instance
+  register: infrastructure_ec2_instance
+  tags:
+    - controller
+    - hub
+    - eda
+  vars:
+    vm_additional_tags:
+      Name: "{{ vm_name }}"
+      app: "{{ app_tag | default('') }}"
+    vm_tags: "{{ vm_additional_tags | combine(_infrastructure_tags) }}"
+  amazon.aws.ec2_instance:
+    network:
+      assign_public_ip: "{{ infrastructure_assign_public_ip }}"
+      delete_on_termination: "{{ infrastructure_delete_on_termination }}"
+    key_name: "{{ infrastructure_keypair_name }}"
+    instance_type: "{{ instance_type }}"
+    image_id: "{{ ami }}"
+    region: "{{ infrastructure_region }}"
+    security_group: "{{ infrastructure_security_group_id }}"
+    volumes: "{{ infrastructure_volumes }}"
+    tags: "{{ vm_tags }}"
+    wait: true
+    vpc_subnet_id: "{{ subnet }}"
+
+- name: Output the IP of new VM
+  when:
+    - infrastructure_ec2_instance.instances is defined
+    - infrastructure_ec2_instance.instances | length > 0
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.debug:
+    msg:
+      - "Public IP for {{ vm_name }}: {{ infrastructure_ec2_instance.instances[0].public_ip_address | default('') }}"
+      - "Private IP for {{ vm_name }}: {{ infrastructure_ec2_instance.instances[0].private_ip_address | default('') }}"
+
+- name: Set stats for Controller of new VM
+  when:
+    - infrastructure_ec2_instance.instances is defined
+    - infrastructure_ec2_instance.instances | length > 0
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.set_stats:
+    data:
+      "{{ vm_name | replace('-','_') }}_priv_network_private_ip": "{{ infrastructure_ec2_instance.instances[0].private_ip_address | default('') }}"
+      "{{ vm_name | replace('-','_') }}_public_ip": "{{ infrastructure_ec2_instance.instances[0].public_ip_address | default('') }}"
+
+- name: Add public IP host to installer
+  tags:
+    - controller
+    - hub
+    - eda
+  when: groups.installer is not defined
+  ansible.builtin.add_host:
+    groups:
+      - installer
+    name: "{{ infrastructure_ec2_instance.instances[0].public_ip_address }}"
+
+- name: Add public IP hosts to group
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.add_host:
+    groups: "{{ public_host_groups + ['public'] | default(['public']) }}"
+    name: "{{ infrastructure_ec2_instance.instances[0].public_ip_address }}"
+
+- name: Add private IPs hosts to group
+  tags:
+    - controller
+    - hub
+    - eda
+  ansible.builtin.add_host:
+    groups: "{{ private_host_groups + ['private'] | default(['private']) }}"
+    name: "{{ infrastructure_ec2_instance.instances[0].private_ip_address }}"

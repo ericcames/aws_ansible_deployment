@@ -1,0 +1,68 @@
+---
+- name: Find RHEL AMI for machines that do not explicitly define the AMI
+  tags:
+    - ami
+  block:
+    - name: Find RHEL AMI
+      register: infrastructure_vm_amis
+      when: infrastructure_vm_ami is not defined
+      amazon.aws.ec2_ami_info:
+        region: "{{ infrastructure_region }}"
+        filters: "{{ infrastructure_ami_filter }}"
+
+    - name: Output RHEL AMI list
+      ansible.builtin.debug:
+        var: infrastructure_vm_amis
+
+    - name: Save ami
+      when:
+        - infrastructure_vm_ami is not defined
+        - infrastructure_vm_amis is defined
+        - infrastructure_vm_amis.images | length > 0
+      ansible.builtin.set_fact:
+        infrastructure_vm_ami: >-
+          {{ (infrastructure_vm_amis.images | selectattr('name', 'defined') | sort(attribute='creation_date'))[-1].image_id }}
+
+    - name: Debug selected AMI
+      when:
+        - infrastructure_vm_ami is defined
+      ansible.builtin.debug:
+        var: infrastructure_vm_ami
+
+- name: Assign RHEL AMI as Controller image
+  when: infrastructure_controller_ami is not defined
+  tags:
+    - ami
+  ansible.builtin.set_fact:
+    infrastructure_controller_ami: "{{ infrastructure_vm_ami }}"
+
+- name: Assign RHEL AMI as Hub image
+  when: infrastructure_hub_ami is not defined
+  tags:
+    - ami
+  ansible.builtin.set_fact:
+    infrastructure_hub_ami: "{{ infrastructure_vm_ami }}"
+
+- name: Assign RHEL AMI as EDA image
+  when: infrastructure_eda_ami is not defined
+  tags:
+    - ami
+  ansible.builtin.set_fact:
+    infrastructure_eda_ami: "{{ infrastructure_vm_ami }}"
+
+- name: Set Stats AMI
+  register: ami_stats
+  tags:
+    - ami
+  ansible.builtin.set_stats:
+    data:
+      controller_ami: "{{ infrastructure_controller_ami }}"
+      hub_ami: "{{ infrastructure_hub_ami }}"
+      eda_ami: "{{ infrastructure_eda_ami }}"
+    per_host: false
+
+- name: Print AMI Stats
+  tags:
+    - ami
+  ansible.builtin.debug:
+    var: ami_stats

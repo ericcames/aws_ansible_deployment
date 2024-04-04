@@ -1,0 +1,230 @@
+---
+- name: Get existing VMs
+  block:
+    - name: Include get vms task
+      tags:
+        - controller
+      ansible.builtin.include_tasks: vms/get.yml
+      vars:
+        app_tag: controller
+        private_host_groups:
+          - aap
+          - controller_private
+        public_host_groups:
+          - controller_public
+
+    - name: Add public IP host to installer
+      tags:
+        - controller
+      when: |
+        (infrastructure_existing_vm is defined
+        and infrastructure_existing_vm.instances | length > 0)
+        and (groups.installer is not defined
+        or groups.installer | length == 0)
+      ansible.builtin.add_host:
+        groups:
+          - installer
+        name: "{{ infrastructure_existing_vm.instances[0].public_ip_address }}"
+
+- name: Set number of Controller VMs to create
+  tags:
+    - controller
+  ansible.builtin.set_fact:
+    infrastructure_controller_vms_to_create: "{{ infrastructure_controller_instances - (infrastructure_existing_vm.instances | default([]) | length) }}"
+
+- name: Output number of VMs to create
+  tags:
+    - controller
+  ansible.builtin.debug:
+    msg: "Creating Controller VMs: {{ infrastructure_controller_vms_to_create }}"
+
+- name: Create VMs
+  when: infrastructure_controller_vms_to_create | int > 0
+  ignore_errors: true
+  vars:
+    subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'controller', 'name') }}"
+  block:
+    - name: Include create vm task
+      loop: "{{ query('sequence', 'start=1 end=' + (infrastructure_controller_vms_to_create | string)) }}"
+      vars:
+        instance_type: "{{ infrastructure_controller_shape }}"
+        ami: "{{ infrastructure_controller_ami }}"
+        vm_name_prefix: controller-
+        subnet: "{{ infrastructure_subnet_ids[subnet_index | int] }}"
+        private_host_groups:
+          - aap
+          - controller_private
+        public_host_groups:
+          - controller_public
+        app_tag: controller
+      tags:
+        - controller
+      ansible.builtin.include_tasks: vms/create.yml
+
+    - name: Wait 10 mins for VMs to become available
+      loop: "{{ groups.public }}"
+      ansible.builtin.wait_for:
+        host: "{{ item }}"
+        port: 22
+        timeout: 600
+
+# Creating the LB operates in its own block and will connect to controller VMs if they were either created
+# when running this deployment for the first time or if they were created in a previous run of the deployment.
+- name: Create a load balancer for controller instances
+  when:
+    - infrastructure_create_controller_lb
+    - infrastructure_controller_instances > 1
+  block:
+    # Query for all controller VMs, both existing and new
+    - name: Get all controller VMs
+      register: infrastructure_existing_vm
+      tags:
+        - controller
+      amazon.aws.ec2_instance_info:
+        filters:
+          "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+          "tag:app": controller
+          "instance-state-name":
+            - pending
+            - running
+            - shutting-down
+            - stopping
+            - stopped
+        region: "{{ infrastructure_region }}"
+
+    - name: Add existing VMs to lb target group
+      loop: "{{ infrastructure_existing_vm.instances }}"
+      tags:
+        - controller
+      vars:
+        vm_lbt_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+        vm_lbt_tags: "{{ vm_lbt_additional_tags | combine(_infrastructure_tags) }}"
+      when:
+        - infrastructure_create_controller_lb
+        - infrastructure_existing_vm is defined
+        - infrastructure_existing_vm.instances | length > 0
+      ansible.builtin.set_fact:
+        infrastructure_lb_targets: "{{ (infrastructure_lb_targets | default([])) + [{\"Id\": item.instance_id, \"Port\": 443}] }}"
+
+    - name: Create a target group for load balancer
+      register: infrastructure_lb_target_group
+      tags:
+        - controller
+      when:
+        - infrastructure_create_controller_lb
+        - infrastructure_lb_targets is defined
+        - infrastructure_lb_targets | length > 0
+      vars:
+        vm_lbtg_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+        vm_lbtg_tags: "{{ vm_lbtg_additional_tags | combine(_infrastructure_tags) }}"
+      community.aws.elb_target_group:
+        region: "{{ infrastructure_region }}"
+        name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+        protocol: https
+        port: 443
+        vpc_id: "{{ infrastructure_vpc_id }}"
+        state: present
+        health_check_protocol: https
+        health_check_path: /
+        # target_type: ip
+        targets: "{{ infrastructure_lb_targets }}"
+        wait: false
+        tags: "{{ vm_lbtg_tags }}"
+
+    - name: Set cert data if one will be created
+      when:
+        - infrastructure_create_controller_lb
+        - infrastructure_cert_path is not defined or infrastructure_cert_key_path is not defined or infrastructure_cert_csr_path is not defined
+        - infrastructure_cert_domain_name is defined
+      ansible.builtin.set_fact:
+        infrastructure_create_cert: true
+        infrastructure_cert_path: "{{ infrastructure_cert_local_folder_path }}{{ infrastructure_cert_domain_name }}.crt"
+        infrastructure_cert_key_path: "{{ infrastructure_cert_local_folder_path }}{{ infrastructure_cert_domain_name }}.pem"
+        infrastructure_cert_csr_path: "{{ infrastructure_cert_local_folder_path }}{{ infrastructure_cert_domain_name }}.csr"
+
+    - name: Create an SSL certificate
+      when:
+        - infrastructure_create_cert is defined
+        - infrastructure_create_cert
+      vars:
+        cert_local_path: "{{ infrastructure_cert_path }}"
+        cert_key_local_path: "{{ infrastructure_cert_key_path }}"
+        cert_csr_local_path: "{{ infrastructure_cert_csr_path }}"
+        cert_domain_name: "{{ infrastructure_cert_domain_name }}"
+      ansible.builtin.import_tasks: certificate.yml
+
+    - name: Upload a certificate
+      register: infrastructure_cert
+      tags:
+        - controller
+      when:
+        - infrastructure_create_controller_lb
+      vars:
+        vm_cert_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-cert"
+        vm_cert_tags: "{{ vm_cert_additional_tags | combine(_infrastructure_tags) }}"
+      community.aws.aws_acm:
+        certificate: "{{ lookup('file', infrastructure_cert_path) }}"
+        private_key: "{{ lookup('file', infrastructure_cert_key_path) }}"
+        domain_name: "{{ infrastructure_cert_domain_name }}"
+        name_tag: "aap-infrastructure-{{ deployment_id }}-cert"
+        region: "{{ infrastructure_region }}"
+        tags: "{{ vm_cert_tags }}"
+
+    - name: Create Controller load balancer
+      register: infrastructure_lb
+      tags:
+        - controller
+      when:
+        - infrastructure_create_controller_lb
+        - infrastructure_cert is defined
+        - infrastructure_cert.certificate.arn is defined
+      vars:
+        controller_subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'controller', 'name') }}"
+        ee_subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'execution', 'name') }}"
+        vm_lb_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-lb"
+        vm_lb_tags: "{{ vm_lb_additional_tags | combine(_infrastructure_tags) }}"
+      amazon.aws.elb_application_lb:
+        name: "aap-infrastructure-{{ deployment_id }}-lb"
+        region: "{{ infrastructure_region }}"
+        security_groups:
+          - "{{ infrastructure_security_group_id }}"
+        subnets:
+          - "{{ infrastructure_subnet_ids[controller_subnet_index | int] }}"
+          - "{{ infrastructure_subnet_ids[ee_subnet_index | int] }}"
+        listeners:
+          - Protocol: HTTPS
+            Port: 443
+            SslPolicy: ELBSecurityPolicy-TLS-1-2-2017-01
+            Certificates:
+              - CertificateArn: "{{ infrastructure_cert.certificate.arn }}"
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "{{ infrastructure_lb_target_group.target_group_name }}"
+          - Protocol: HTTP
+            Port: 80
+            DefaultActions:
+              - Type: redirect
+                RedirectConfig:
+                  Host: "#{host}"
+                  Path: "/#{path}"
+                  Port: "443"
+                  Protocol: HTTPS
+                  Query: "#{query}"
+                  StatusCode: "HTTP_301"
+        ip_address_type: ipv4
+        scheme: "{{ infrastructure_lb_scheme }}"
+        state: present
+        tags: "{{ vm_lb_tags }}"
+
+    - name: Set LB stats
+      tags:
+        - controller
+      ansible.builtin.set_stats:
+        data:
+          load_balancer_arn: "{{ infrastructure_lb.load_balancer_arn }}"
+          load_balancer_dns: "{{ infrastructure_lb.dns_name }}"
+        per_host: false

@@ -1,0 +1,63 @@
+---
+- name: Check AAP controller configuration
+  tags:
+    - always
+  ansible.builtin.assert:
+    that:
+      - infrastructure_controller_instances > 0
+    msg: This tool must install at least one instance of Ansible Automation Controller
+
+- name: Create deployment details
+  tags:
+    - always
+  ansible.builtin.include_tasks: deployment.yml
+
+- name: Set tag variables
+  tags:
+    - always
+  ansible.builtin.include_tasks: tags.yml
+
+- name: Configure Network
+  tags:
+    - network
+  ansible.builtin.include_tasks: network.yml
+
+- name: Check Network configuration
+  tags:
+    - always
+  ansible.builtin.assert:
+    that:
+      - infrastructure_vpc_id is defined and (infrastructure_vpc_id | length > 0)
+      - infrastructure_subnet_ids is defined and (infrastructure_subnet_ids | length > 0)
+      - infrastructure_security_group_id is defined and (infrastructure_security_group_id | length > 0)
+    msg: Network variables are either missing, or an existing deployment could not be found. Set the proper network variables before proceeding.
+
+- name: Create RDS database
+  tags:
+    - database
+  ansible.builtin.include_tasks: database.yml
+
+- name: Configure Amazon Machine Images (AMI)
+  tags:
+    - ami
+  ansible.builtin.include_tasks: ami.yml
+
+- name: Create Controller VMs
+  tags:
+    - controller
+  ansible.builtin.include_tasks: controller.yml
+
+- name: Create Execution Node VMs
+  tags:
+    - execution
+  ansible.builtin.include_tasks: execution.yml
+
+- name: Create Hub VMs
+  tags:
+    - hub
+  ansible.builtin.include_tasks: hub.yml
+
+- name: Create EDA VMs
+  tags:
+    - eda
+  ansible.builtin.include_tasks: eda.yml

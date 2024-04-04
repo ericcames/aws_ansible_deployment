@@ -1,0 +1,147 @@
+---
+- name: Destroy VMs
+  register: deleted_instances
+  amazon.aws.ec2_instance:
+    region: "{{ infrastructure_region }}"
+    state: absent
+    filters:
+      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+      "instance-state-name":
+        - pending
+        - running
+        - shutting-down
+        - stopping
+        - stopped
+    wait: true
+
+- name: Delete database
+  register: deleted_databases
+  amazon.aws.rds_instance:
+    region: "{{ infrastructure_region }}"
+    state: absent
+    db_instance_identifier: "aap-infrastructure-{{ deployment_id }}-db"
+    skip_final_snapshot: true
+
+- name: Delete db subnet group
+  register: deleted_db_subnet_group
+  amazon.aws.rds_subnet_group:
+    region: "{{ infrastructure_region }}"
+    state: absent
+    name: "aap-infrastructure-{{ deployment_id }}-subnet-group"
+
+- name: Delete load balancer
+  register: deleted_lb
+  amazon.aws.elb_application_lb:
+    name: "aap-infrastructure-{{ deployment_id }}-lb"
+    region: "{{ infrastructure_region }}"
+    state: absent
+    wait: true
+
+- name: Delete target group for load balancer
+  register: deleted_target_group
+  community.aws.elb_target_group:
+    region: "{{ infrastructure_region }}"
+    name: "aap-infrastructure-{{ deployment_id }}-lbtg"
+    state: absent
+    wait: true
+
+- name: Wait 30 seconds for LB to delete to release certificate
+  delegate_to: localhost
+  ansible.builtin.wait_for:
+    timeout: 30
+
+- name: Delete load balancer certificate
+  register: deleted_cert
+  community.aws.aws_acm:
+    name_tag: "aap-infrastructure-{{ deployment_id }}-cert"
+    region: "{{ infrastructure_region }}"
+    state: absent
+
+- name: Get VPC
+  register: vpcs
+  amazon.aws.ec2_vpc_net_info:
+    region: "{{ infrastructure_region }}"
+    filters:
+      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+
+- name: Get subnets
+  register: subnets
+  amazon.aws.ec2_vpc_subnet_info:
+    region: "{{ infrastructure_region }}"
+    filters:
+      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+
+- name: Delete subnets
+  loop: "{{ subnets.subnets }}"
+  register: deleted_subnets
+  when:
+    - vpcs is defined
+    - vpcs.vpcs | length > 0
+    - subnets is defined
+    - subnets.subnets | length > 0
+  amazon.aws.ec2_vpc_subnet:
+    region: "{{ infrastructure_region }}"
+    cidr: "{{ item.cidr_block }}"
+    vpc_id: "{{ vpcs.vpcs[0].id }}"
+    state: absent
+
+- name: Delete Internet Gateways
+  register: deleted_igws
+  when:
+    - vpcs is defined
+    - vpcs.vpcs | length > 0
+  amazon.aws.ec2_vpc_igw:
+    region: "{{ infrastructure_region }}"
+    vpc_id: "{{ vpcs.vpcs[0].id }}"
+    state: absent
+
+- name: Get security groups
+  register: sgs
+  amazon.aws.ec2_security_group_info:
+    region: "{{ infrastructure_region }}"
+    filters:
+      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+
+- name: Delete security groups
+  loop: "{{ sgs.security_groups }}"
+  register: deleted_sgs
+  when:
+    - sgs is defined
+    - sgs.security_groups | length > 0
+  amazon.aws.ec2_security_group:
+    region: "{{ infrastructure_region }}"
+    group_id: "{{ item.group_id }}"
+    state: absent
+
+- name: Get route tables
+  register: rts
+  amazon.aws.ec2_vpc_route_table_info:
+    region: "{{ infrastructure_region }}"
+    filters:
+      "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+
+- name: Delete route tables
+  loop: "{{ rts.route_tables }}"
+  register: deleted_rts
+  when:
+    - vpcs is defined
+    - vpcs.vpcs | length > 0
+    - rts is defined
+    - rts.route_tables | length > 0
+  amazon.aws.ec2_vpc_route_table:
+    region: "{{ infrastructure_region }}"
+    route_table_id: "{{ item.id }}"
+    vpc_id: "{{ vpcs.vpcs[0].vpc_id }}"
+    lookup: id
+    state: absent
+
+- name: Delete VPC
+  loop: "{{ vpcs.vpcs }}"
+  register: deleted_vpcs
+  when:
+    - vpcs is defined
+    - vpcs.vpcs | length > 0
+  amazon.aws.ec2_vpc_net:
+    region: "{{ infrastructure_region }}"
+    vpc_id: "{{ item.vpc_id }}"
+    state: absent

@@ -1,0 +1,166 @@
+---
+- name: Create VPC
+  block:
+    # - name: Create VPC facts
+    #   tags:
+    #     - network
+    #   ansible.builtin.set_fact:
+    #     vpc_additional_tags:
+    #       Name: "aap-infrastructure-{{ deployment_id }}-vpc"
+    #     vpc_tags: "{{ vpc_additional_tags | combine(_infrastructure_tags) }}"
+    #
+
+    - name: Create VPC
+      register: infrastructure_vpc
+      tags:
+        - network
+      vars:
+        vpc_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-vpc"
+        vpc_tags: "{{ vpc_additional_tags | combine(_infrastructure_tags) }}"
+      amazon.aws.ec2_vpc_net:
+        name: "aap-infrastructure-{{ deployment_id }}-vpc"
+        cidr_block: "{{ infrastructure_vpc_cidr }}"
+        purge_tags: false
+        region: "{{ infrastructure_region }}"
+        state: present
+        tags: "{{ vpc_tags }}"
+
+    - name: Save VPC id
+      when: infrastructure_vpc is defined
+      tags:
+        - network
+      ansible.builtin.set_fact:
+        infrastructure_vpc_id: "{{ infrastructure_vpc.vpc.id }}"
+
+- name: Create subnets
+  block:
+    - name: Create subnets
+      loop: "{{ infrastructure_vpc_subnets }}"
+      register: infrastructure_subnets
+      tags:
+        - network
+      vars:
+        subnet_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-subnet-{{ item.name }}"
+        subnet_tags: "{{ subnet_additional_tags | combine(_infrastructure_tags) }}"
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ infrastructure_vpc_id }}"
+        cidr: "{{ item.cidr }}"
+        region: "{{ infrastructure_region }}"
+        az: "{{ item.az }}"
+        state: present
+        tags: "{{ subnet_tags }}"
+
+    - name: Save subnet ids
+      when: infrastructure_subnets is defined
+      tags:
+        - network
+      ansible.builtin.set_fact:
+        infrastructure_subnet_ids: "{{ infrastructure_subnets.results | map(attribute='subnet.id') | list }}"
+
+- name: Create new Internet Gateway
+  when: infrastructure_igw_id is not defined
+  block:
+    - name: Create igw
+      register: infrastructure_igw
+      tags:
+        - network
+      vars:
+        igw_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-igw"
+        igw_tags: "{{ igw_additional_tags | combine(_infrastructure_tags) }}"
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ infrastructure_vpc_id }}"
+        region: "{{ infrastructure_region }}"
+        state: present
+        tags: "{{ igw_tags }}"
+
+    - name: Save igw
+      when: infrastructure_igw is defined
+      tags:
+        - network
+      ansible.builtin.set_fact:
+        infrastructure_igw_id: "{{ infrastructure_igw.gateway_id }}"
+
+- name: Create new security group
+  when: infrastructure_security_group_id is not defined
+  block:
+    - name: Create security group
+      register: infrastructure_security_group
+      tags:
+        - network
+      vars:
+        sg_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-sg"
+        sg_tags: "{{ sg_additional_tags | combine(_infrastructure_tags) }}"
+      amazon.aws.ec2_security_group:
+        name: "aap-infrastructure-{{ deployment_id }}-sg"
+        description: AAP security group
+        vpc_id: "{{ infrastructure_vpc_id }}"
+        region: "{{ infrastructure_region }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 22
+              - 80
+              - 443
+              - 27199
+            cidr_ip: 0.0.0.0/0
+            rule_desc: allow external ports for SSH, HTTPS, and Automation Mesh
+          - proto: icmp
+            icmp_type: -1
+            icmp_code: -1
+            cidr_ip: "{{ infrastructure_vpc_cidr }}"
+            rule_desc: allow ping on local net
+          - proto: tcp
+            ports:
+              - 22
+              - 80
+              - 443
+              - 5432
+              - 8443
+              - 27199
+            cidr_ip: "{{ infrastructure_vpc_cidr }}"
+            rule_desc: allow aap ports on local net
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+            rule_desc: allow all outbound
+        tags: "{{ sg_tags }}"
+
+    - name: Save security group id
+      when:
+        - infrastructure_security_group is defined
+      tags:
+        - network
+      ansible.builtin.set_fact:
+        infrastructure_security_group_id: "{{ infrastructure_security_group.group_id }}"
+
+- name: Create new route table
+  when: infrastructure_route_table_id is not defined
+  block:
+    - name: Create route table
+      register: infrastructure_route_table
+      tags:
+        - network
+      vars:
+        rt_additional_tags:
+          Name: "aap-infrastructure-{{ deployment_id }}-rt"
+        rt_tags: "{{ rt_additional_tags | combine(_infrastructure_tags) }}"
+      amazon.aws.ec2_vpc_route_table:
+        region: "{{ infrastructure_region }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ infrastructure_igw_id }}"
+        vpc_id: "{{ infrastructure_vpc_id }}"
+        subnets: "{{ infrastructure_subnet_ids }}"
+        tags: "{{ rt_tags }}"
+
+    - name: Save route table id
+      when:
+        - infrastructure_route_table is defined
+      tags:
+        - network
+      ansible.builtin.set_fact:
+        infrastructure_route_table_id: "{{ infrastructure_route_table.route_table.id }}"

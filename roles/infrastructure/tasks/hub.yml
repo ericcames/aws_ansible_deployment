@@ -1,0 +1,50 @@
+---
+- name: Get existing VMs
+  block:
+    - name: Include get vms task
+      vars:
+        app_tag: hub
+        private_host_groups:
+          - aap
+          - hub_private
+        public_host_groups:
+          - hub_public
+      tags:
+        - hub
+      ansible.builtin.include_tasks: vms/get.yml
+
+- name: Set number of hub VMs to create
+  tags:
+    - hub
+  ansible.builtin.set_fact:
+    infrastructure_hub_vms_to_create: "{{ infrastructure_hub_instances - (infrastructure_existing_vm.instances | default([]) | length) }}"
+
+
+- name: Output number of VMs to create
+  tags:
+    - hub
+  ansible.builtin.debug:
+    msg: "Creating hub VMs: {{ infrastructure_hub_vms_to_create }}"
+
+- name: Create VMs
+  when: infrastructure_hub_vms_to_create | int > 0
+  ignore_errors: true
+  vars:
+    subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'hub', 'name') }}"
+  block:
+    - name: Include create vm task
+      loop: "{{ query('sequence', 'start=1 end=' + (infrastructure_hub_vms_to_create | string)) }}"
+      vars:
+        instance_type: "{{ infrastructure_hub_shape }}"
+        ami: "{{ infrastructure_hub_ami }}"
+        vm_name_prefix: hub-
+        private_host_groups:
+          - aap
+          - hub_private
+        public_host_groups:
+          - hub_public
+        app_tag: hub
+        subnet: "{{ infrastructure_subnet_ids[subnet_index | int] }}"
+      tags:
+        - hub
+      ansible.builtin.include_tasks: vms/create.yml

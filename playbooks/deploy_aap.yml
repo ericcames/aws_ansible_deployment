@@ -1,0 +1,48 @@
+---
+- name: Deploy AWS infrastructure
+  hosts: localhost
+  connection: local
+
+  tasks:
+
+    - name: Deploy Infrastructure
+      tags:
+        - always
+      ansible.builtin.include_role:
+        name: infrastructure
+
+    - name: Wait 10 mins for all VMs to become available
+      loop: "{{ groups.public }}"
+      tags:
+        - controller
+        - hub
+        - eda
+      ansible.builtin.wait_for:
+        host: "{{ item }}"
+        port: 22
+        timeout: 600
+
+- name: Ensure VMs are up-to-date
+  hosts: public
+  gather_facts: true
+  become: true
+
+  tasks:
+
+    - name: Configure RHEL subscription manager
+      tags:
+        - controller
+        - hub
+        - eda
+      ansible.builtin.include_role:
+        name: infrastructure
+        tasks_from: vms/subscription_manager
+
+    - name: Manage RHEL packages
+      tags:
+        - controller
+        - hub
+        - eda
+      ansible.builtin.include_role:
+        name: infrastructure
+        tasks_from: vms/dnf

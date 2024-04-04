@@ -1,0 +1,68 @@
+---
+- name: Get existing VMs
+  block:
+    - name: Include get vms task
+      vars:
+        app_tag: eda
+        private_host_groups:
+          - aap
+          - eda_private
+        public_host_groups:
+          - eda_public
+      tags:
+        - eda
+      ansible.builtin.include_tasks: vms/get.yml
+
+    - name: Save the public IP so that it can be added to EDA ALLOWED_HOSTS
+      when:
+        - infrastructure_existing_vm.instances is defined
+        - infrastructure_existing_vm.instances | length > 0
+      tags:
+        - eda
+      ansible.builtin.add_host:
+        groups:
+          - eda_public
+        name: "{{ infrastructure_existing_vm.instances[0].public_ip_address }}"
+
+- name: Set number of eda VMs to create
+  tags:
+    - eda
+  ansible.builtin.set_fact:
+    infrastructure_eda_vms_to_create: "{{ infrastructure_eda_instances - (infrastructure_existing_vm.instances | default([]) | length) }}"
+
+- name: Output number of VMs to create
+  tags:
+    - eda
+  ansible.builtin.debug:
+    msg: "Creating eda VMs: {{ infrastructure_eda_vms_to_create }}"
+
+- name: Create VMs
+  when: infrastructure_eda_vms_to_create | int > 0
+  ignore_errors: true
+  vars:
+    subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'eda', 'name') }}"
+  block:
+    - name: Include create vm task
+      loop: "{{ query('sequence', 'start=1 end=' + (infrastructure_eda_vms_to_create | string)) }}"
+      vars:
+        instance_type: "{{ infrastructure_eda_shape }}"
+        ami: "{{ infrastructure_eda_ami }}"
+        vm_name_prefix: eda-
+        private_host_groups:
+          - aap
+          - eda_private
+        public_host_groups:
+          - eda_public
+        app_tag: eda
+        subnet: "{{ infrastructure_subnet_ids[subnet_index | int] }}"
+      tags:
+        - eda
+      ansible.builtin.include_tasks: vms/create.yml
+
+    - name: Save the public IP so that it can be added to EDA ALLOWED_HOSTS
+      tags:
+        - eda
+      ansible.builtin.add_host:
+        groups:
+          - eda_public
+        name: "{{ infrastructure_ec2_instance.instances[0].public_ip_address }}"
