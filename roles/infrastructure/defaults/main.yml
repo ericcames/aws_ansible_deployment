@@ -72,3 +72,6 @@ infrastructure_db_allocated_storage: 100
 # RHEL
 infrastructure_aap_version: "2.4"
 infrastructure_rhel_version: "9"
+
+# Python
+ansible_python_interpreter: /usr/bin/python3
