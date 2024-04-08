@@ -1,11 +1,8 @@
 ---
 - name: Get existing VMs
-
   block:
-
     - name: Include get vms task
-      tags:
-        - controller
+      ansible.builtin.include_tasks: vms/get.yml
       vars:
         app_tag: controller
         private_host_groups:
@@ -13,11 +10,10 @@
           - controller_private
         public_host_groups:
           - controller_public
-      ansible.builtin.include_tasks: vms/get.yml
-
-    - name: Add public IP host to installer
       tags:
         - controller
+
+    - name: Add public IP host to installer
       when: |
         (infrastructure_existing_vm is defined
         and infrastructure_existing_vm.instances | length > 0)
@@ -27,28 +23,29 @@
         groups:
           - installer
         name: "{{ infrastructure_existing_vm.instances[0].public_ip_address }}"
+      tags:
+        - controller
 
 - name: Set number of Controller VMs to create
-  tags:
-    - controller
   ansible.builtin.set_fact:
     infrastructure_controller_vms_to_create: "{{ infrastructure_controller_instances - (infrastructure_existing_vm.instances | default([]) | length) }}"
-
-- name: Output number of VMs to create
   tags:
     - controller
+
+- name: Output number of VMs to create
   ansible.builtin.debug:
     msg: "Creating Controller VMs: {{ infrastructure_controller_vms_to_create }}"
+  tags:
+    - controller
 
 - name: Create VMs
   when: infrastructure_controller_vms_to_create | int > 0
   ignore_errors: true
   vars:
     subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'controller', 'name') }}"
-
   block:
-
     - name: Include create vm task
+      ansible.builtin.include_tasks: vms/create.yml
       loop: "{{ query('sequence', 'start=1 end=' + (infrastructure_controller_vms_to_create | string)) }}"
       vars:
         instance_type: "{{ infrastructure_controller_shape }}"
@@ -63,14 +60,13 @@
         app_tag: controller
       tags:
         - controller
-      ansible.builtin.include_tasks: vms/create.yml
 
     - name: Wait 10 mins for VMs to become available
-      loop: "{{ groups.public }}"
       ansible.builtin.wait_for:
         host: "{{ item }}"
         port: 22
         timeout: 600
+      loop: "{{ groups.public }}"
 
 # Creating the LB operates in its own block and will connect to controller VMs if they were either created
 # when running this deployment for the first time or if they were created in a previous run of the deployment.
@@ -78,56 +74,51 @@
   when:
     - infrastructure_create_controller_lb
     - infrastructure_controller_instances > 1
-
   block:
-
     # Query for all controller VMs, both existing and new
     - name: Get all controller VMs
-      register: infrastructure_existing_vm
-      tags:
-        - controller
       amazon.aws.ec2_instance_info:
         filters:
-          tag:deployment: aap-infrastructure-{{ deployment_id }}
-          tag:app: controller
-          instance-state-name:
+          "tag:deployment": "aap-infrastructure-{{ deployment_id }}"
+          "tag:app": controller
+          "instance-state-name":
             - pending
             - running
             - shutting-down
             - stopping
             - stopped
         region: "{{ infrastructure_region }}"
-
-    - name: Add existing VMs to lb target group
-      loop: "{{ infrastructure_existing_vm.instances }}"
+      register: infrastructure_existing_vm
       tags:
         - controller
+
+    - name: Add existing VMs to lb target group
       vars:
         vm_lbt_additional_tags:
-          Name: aap-infrastructure-{{ deployment_id }}-lbtg
+          Name: "aap-infrastructure-{{ deployment_id }}-lbtg"
         vm_lbt_tags: "{{ vm_lbt_additional_tags | combine(_infrastructure_tags) }}"
       when:
         - infrastructure_create_controller_lb
         - infrastructure_existing_vm is defined
         - infrastructure_existing_vm.instances | length > 0
       ansible.builtin.set_fact:
-        infrastructure_lb_targets: '{{ (infrastructure_lb_targets | default([])) + [{"Id": item.instance_id, "Port": 443}] }}'
-
-    - name: Create a target group for load balancer
-      register: infrastructure_lb_target_group
+        infrastructure_lb_targets: "{{ (infrastructure_lb_targets | default([])) + [{\"Id\": item.instance_id, \"Port\": 443}] }}"
+      loop: "{{ infrastructure_existing_vm.instances }}"
       tags:
         - controller
+
+    - name: Create a target group for load balancer
       when:
         - infrastructure_create_controller_lb
         - infrastructure_lb_targets is defined
         - infrastructure_lb_targets | length > 0
       vars:
         vm_lbtg_additional_tags:
-          Name: aap-infrastructure-{{ deployment_id }}-lbtg
+          Name: "aap-infrastructure-{{ deployment_id }}-lbtg"
         vm_lbtg_tags: "{{ vm_lbtg_additional_tags | combine(_infrastructure_tags) }}"
       community.aws.elb_target_group:
         region: "{{ infrastructure_region }}"
-        name: aap-infrastructure-{{ deployment_id }}-lbtg
+        name: "aap-infrastructure-{{ deployment_id }}-lbtg"
         protocol: https
         port: 443
         vpc_id: "{{ infrastructure_vpc_id }}"
@@ -138,6 +129,9 @@
         targets: "{{ infrastructure_lb_targets }}"
         wait: false
         tags: "{{ vm_lbtg_tags }}"
+      register: infrastructure_lb_target_group
+      tags:
+        - controller
 
     - name: Set cert data if one will be created
       when:
@@ -162,27 +156,24 @@
       ansible.builtin.import_tasks: certificate.yml
 
     - name: Upload a certificate
-      register: infrastructure_cert
-      tags:
-        - controller
       when:
         - infrastructure_create_controller_lb
       vars:
         vm_cert_additional_tags:
-          Name: aap-infrastructure-{{ deployment_id }}-cert
+          Name: "aap-infrastructure-{{ deployment_id }}-cert"
         vm_cert_tags: "{{ vm_cert_additional_tags | combine(_infrastructure_tags) }}"
       community.aws.aws_acm:
         certificate: "{{ lookup('file', infrastructure_cert_path) }}"
         private_key: "{{ lookup('file', infrastructure_cert_key_path) }}"
         domain_name: "{{ infrastructure_cert_domain_name }}"
-        name_tag: aap-infrastructure-{{ deployment_id }}-cert
+        name_tag: "aap-infrastructure-{{ deployment_id }}-cert"
         region: "{{ infrastructure_region }}"
         tags: "{{ vm_cert_tags }}"
-
-    - name: Create Controller load balancer
-      register: infrastructure_lb
+      register: infrastructure_cert
       tags:
         - controller
+
+    - name: Create Controller load balancer
       when:
         - infrastructure_create_controller_lb
         - infrastructure_cert is defined
@@ -191,10 +182,10 @@
         controller_subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'controller', 'name') }}"
         ee_subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'execution', 'name') }}"
         vm_lb_additional_tags:
-          Name: aap-infrastructure-{{ deployment_id }}-lb
+          Name: "aap-infrastructure-{{ deployment_id }}-lb"
         vm_lb_tags: "{{ vm_lb_additional_tags | combine(_infrastructure_tags) }}"
       amazon.aws.elb_application_lb:
-        name: aap-infrastructure-{{ deployment_id }}-lb
+        name: "aap-infrastructure-{{ deployment_id }}-lb"
         region: "{{ infrastructure_region }}"
         security_groups:
           - "{{ infrastructure_security_group_id }}"
@@ -216,21 +207,24 @@
               - Type: redirect
                 RedirectConfig:
                   Host: "#{host}"
-                  Path: /#{path}
+                  Path: "/#{path}"
                   Port: "443"
                   Protocol: HTTPS
                   Query: "#{query}"
-                  StatusCode: HTTP_301
+                  StatusCode: "HTTP_301"
         ip_address_type: ipv4
         scheme: "{{ infrastructure_lb_scheme }}"
         state: present
         tags: "{{ vm_lb_tags }}"
-
-    - name: Set LB stats
+      register: infrastructure_lb
       tags:
         - controller
+
+    - name: Set LB stats
       ansible.builtin.set_stats:
         data:
           load_balancer_arn: "{{ infrastructure_lb.load_balancer_arn }}"
           load_balancer_dns: "{{ infrastructure_lb.dns_name }}"
         per_host: false
+      tags:
+        - controller
