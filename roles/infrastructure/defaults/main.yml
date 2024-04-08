@@ -1,22 +1,22 @@
 ---
 # Infrastructure Defaults
-infrastructure_region: us-west-2
+infrastructure_region: us-east-1
 infrastructure_tags: []
 # Networking
 infrastructure_vpc_cidr: 172.16.0.0/22
 infrastructure_vpc_subnets:
   - name: controller
     cidr: 172.16.0.0/24
-    az: us-west-2a
+    az: us-east-1a
   - name: execution
     cidr: 172.16.1.0/24
-    az: us-west-2b
+    az: us-east-1b
   - name: hub
     cidr: 172.16.2.0/24
-    az: us-west-2a
+    az: us-east-1c
   - name: eda
     cidr: 172.16.3.0/24
-    az: us-west-2a
+    az: us-east-1d
 
 # Compute
 infrastructure_assign_public_ip: true
