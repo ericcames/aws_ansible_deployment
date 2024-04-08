@@ -1,10 +1,11 @@
 ---
 - name: Get existing VMs
+
   block:
+
     - name: Include get vms task
       tags:
         - controller
-      ansible.builtin.include_tasks: vms/get.yml
       vars:
         app_tag: controller
         private_host_groups:
@@ -12,6 +13,7 @@
           - controller_private
         public_host_groups:
           - controller_public
+      ansible.builtin.include_tasks: vms/get.yml
 
     - name: Add public IP host to installer
       tags:
@@ -43,7 +45,9 @@
   ignore_errors: true
   vars:
     subnet_index: "{{ lookup('ansible.utils.index_of', infrastructure_vpc_subnets, 'eq', 'controller', 'name') }}"
+
   block:
+
     - name: Include create vm task
       loop: "{{ query('sequence', 'start=1 end=' + (infrastructure_controller_vms_to_create | string)) }}"
       vars:
@@ -74,7 +78,9 @@
   when:
     - infrastructure_create_controller_lb
     - infrastructure_controller_instances > 1
+
   block:
+
     # Query for all controller VMs, both existing and new
     - name: Get all controller VMs
       register: infrastructure_existing_vm
