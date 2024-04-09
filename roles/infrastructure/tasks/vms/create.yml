@@ -5,8 +5,7 @@
     - hub
     - eda
   ansible.builtin.set_fact:
-    vm_name: aap-infrastructure-{{ deployment_id }}-vm-{{ vm_name_prefix | default('') }}{{ query('community.general.random_string', upper=false, numbers=false, special=false)
-      | first }}
+    vm_name: aap-infrastructure-{{ deployment_id }}-vm-{{ vm_name_prefix | default('') }}{{ query('community.general.random_string', upper=false, numbers=false, special=false)| first }}
 
 - name: Debug VM name
   tags:
