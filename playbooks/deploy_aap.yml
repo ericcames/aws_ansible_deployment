@@ -2,6 +2,9 @@
 - name: Deploy AWS infrastructure
   hosts: localhost
   connection: local
+  vars_files:
+    - env/vars.yml
+    - env/secrets.yml
 
   tasks:
     - name: Deploy Infrastructure
