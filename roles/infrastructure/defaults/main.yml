@@ -81,7 +81,7 @@ ansible_python_interpreter: /usr/bin/python3
 aap_admin_password: changeme
 
 aap_installer_ssh_key: aws_test_key
-aap_installer_ssh_key_src: "~/.ssh/{{ aap_installer_ssh_key }}"
+aap_installer_ssh_key_src: ~/.ssh/{{ aap_installer_ssh_key }}
 
 aap_run_installer: true
 aap_remove_installer_after_install: true
