@@ -39,9 +39,9 @@ infrastructure_volumes:
       delete_on_termination: true
 
 infrastructure_cert_local_folder_path: /etc/ssl/
-infrastructure_cert_domain_name: my.custom.domain
+infrastructure_cert_domain_name: aap.example.com
 
-infrastructure_create_controller_lb: false
+infrastructure_create_controller_lb: true
 infrastructure_lb_scheme: internet-facing
 
 infrastructure_controller_instances: 1
