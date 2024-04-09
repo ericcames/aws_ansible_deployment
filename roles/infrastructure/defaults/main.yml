@@ -1,7 +1,9 @@
 ---
 # Infrastructure Defaults
 infrastructure_region: us-west-2
-infrastructure_tags: []
+infrastructure_tags:
+  deployment_owner: eric
+
 # Networking
 infrastructure_vpc_cidr: 172.16.0.0/22
 infrastructure_vpc_subnets:
@@ -74,3 +76,16 @@ infrastructure_rhel_version: "9"
 
 # Python
 ansible_python_interpreter: /usr/bin/python3
+
+# AAP
+aap_admin_password: changeme
+
+aap_installer_ssh_key: aws_test_key
+aap_installer_ssh_key_src: "~/.ssh/{{ aap_installer_ssh_key }}"
+
+aap_run_installer: true
+aap_remove_installer_after_install: true
+
+# Customer Portal Credentials
+aap_red_hat_username: mickey
+aap_red_hat_password: changeme
