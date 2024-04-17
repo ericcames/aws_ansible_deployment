@@ -4,6 +4,12 @@ infrastructure_region: us-west-2
 infrastructure_tags:
   deployment_owner: eric
 
+# AMI information
+infrastructure_vm_ami: ''
+infrastructure_controller_ami: ''
+infrastructure_hub_ami: ''
+infrastructure_eda_ami: ''
+
 # Networking
 infrastructure_vpc_cidr: 172.16.0.0/22
 infrastructure_vpc_subnets:
