@@ -20,13 +20,11 @@
         region: "{{ infrastructure_region }}"
 
     - name: Add public IP host to aap group
-      loop: "{{ infrastructure_existing_vm.instances }}"
       when:
         - infrastructure_existing_vm is defined
         - infrastructure_existing_vm.instances | length > 0
       ansible.builtin.add_host:
-        groups:
-          - aap
+        groups: "{{ infrastructure_existing_vm.instances }}"
         name: "{{ item.public_ip_address }}"
 
 - name: Remove RHEL entitlements

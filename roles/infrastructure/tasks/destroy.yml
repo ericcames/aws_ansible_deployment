@@ -52,7 +52,7 @@
 
 - name: Delete load balancer certificate
   register: deleted_cert
-  community.aws.aws_acm:
+  community.aws.acm_certificate:
     name_tag: aap-infrastructure-{{ deployment_id }}-cert
     region: "{{ infrastructure_region }}"
     state: absent
