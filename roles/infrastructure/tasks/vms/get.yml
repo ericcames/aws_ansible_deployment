@@ -33,19 +33,17 @@
     region: "{{ infrastructure_region }}"
 
 - name: Add public IP hosts to group
-  loop: "{{ infrastructure_existing_vm.instances }}"
   when: infrastructure_existing_vm.instances | length > 0
   tags:
     - controller
   ansible.builtin.add_host:
-    groups: "{{ public_host_groups + ['public'] | default(['public']) }}"
+    groups: "{{ infrastructure_existing_vm.instances }}"
     name: "{{ item.public_ip_address }}"
 
 - name: Add private IPs hosts to group
-  loop: "{{ infrastructure_existing_vm.instances }}"
   when: infrastructure_existing_vm.instances | length > 0
   tags:
     - controller
   ansible.builtin.add_host:
-    groups: "{{ private_host_groups + ['private'] | default(['private']) }}"
+    groups: "{{ infrastructure_existing_vm.instances }}"
     name: "{{ item.private_ip_address }}"

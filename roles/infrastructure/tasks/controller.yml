@@ -162,16 +162,16 @@
         vm_cert_additional_tags:
           Name: aap-infrastructure-{{ deployment_id }}-cert
         vm_cert_tags: "{{ vm_cert_additional_tags | combine(_infrastructure_tags) }}"
-      community.aws.aws_acm:
+      register: infrastructure_cert
+      tags:
+        - controller
+      community.aws.acm_certificate:
         certificate: "{{ lookup('file', infrastructure_cert_path) }}"
         private_key: "{{ lookup('file', infrastructure_cert_key_path) }}"
         domain_name: "{{ infrastructure_cert_domain_name }}"
         name_tag: aap-infrastructure-{{ deployment_id }}-cert
         region: "{{ infrastructure_region }}"
         tags: "{{ vm_cert_tags }}"
-      register: infrastructure_cert
-      tags:
-        - controller
 
     - name: Create Controller load balancer
       when:
